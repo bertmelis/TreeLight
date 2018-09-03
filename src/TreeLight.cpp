@@ -181,6 +181,13 @@ void TreeLightClass::loop() {
   }
 }
 
+TreeLightNode* TreeLightClass::findNode(const char* name) {
+  for (TreeLightNode* n : TreeLightNode::_nodes) {
+    if (strcmp(n->name, name) == 0) return n;
+  }
+  return nullptr;
+}
+
 void TreeLightClass::setNode(TreeLightNode& node, const char* value) {  // NOLINT
   strncpy(node.value, value, sizeof(node.value)-1);
   DynamicJsonBuffer jsonBuffer;
