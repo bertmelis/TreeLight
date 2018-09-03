@@ -1,0 +1,34 @@
+{
+  "name": "TreeLight",
+  "version": "0.1.0",
+  "keywords": "iot, home, webserver, automation, mqtt, esp8266, async",
+  "description": "Small MQTT framework for ESP8266. Connect your ESP8266 to MQTT in no time. It comes with a handy status webpage too!",
+  "homepage": "http://www.github.com/bertmelis/TreeLight",
+  "license": "MIT",
+  "authors":
+  {
+    "name": "Bert Melis",
+    "url": "https://www.github.com/bertmelis",
+    "maintainer": true
+  },
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/bertmelis/TreeLight.git",
+    "branch": "master"
+  },
+  "frameworks": "arduino",
+  "platforms": ["espressif8266"],
+  "dependencies": [
+    {
+      "name": "ArduinoJson",
+      "platforms": ["espressif8266"]
+    },
+    {
+      "name": "AsyncMqttClient"
+    },
+    {
+      "name": "ESP Async WebServer"
+    }
+  ]
+}

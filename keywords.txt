@@ -1,0 +1,26 @@
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+
+TreeLight	KEYWORD1
+TreeLightNode	KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+setHostname	KEYWORD2
+setupWiFi	KEYWORD2
+setupServer	KEYWORD2
+setupMqtt	KEYWORD2
+begin	KEYWORD2
+loop	KEYWORD2
+setNode	KEYWORD2
+updateStats	KEYWORD2
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+BOOL	LITERAL2
+NUMBER	LITERAL2
