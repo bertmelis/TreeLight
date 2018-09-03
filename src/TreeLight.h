@@ -49,7 +49,7 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Helpers/Uptime.h"
 
 enum TreeLightNodeType {
-  BOOL,
+  SWITCH,
   NUMBER
 };
 
