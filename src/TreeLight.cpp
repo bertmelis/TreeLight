@@ -44,8 +44,8 @@ TreeLightNode::~TreeLightNode() {
 
 const char* TreeLightNode::getType() const {
   switch (type) {
-    case BOOL:
-      return "BOOL";
+    case SWITCH:
+      return "SWITCH";
     case NUMBER:
       return "NUMBER";
   }
