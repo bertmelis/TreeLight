@@ -33,10 +33,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define SECS_PER_MIN  (60UL)
 #define SECS_PER_HOUR (SECS_PER_MIN * 60UL)
 #define SECS_PER_DAY  (SECS_PER_HOUR * 24UL)
-#define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)  
-#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN) 
-#define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
-#define elapsedDays(_time_) ( _time_ / SECS_PER_DAY)  
+#define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)
+#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN)
+#define numberOfHours(_time_) ((_time_% SECS_PER_DAY) / SECS_PER_HOUR)
+#define elapsedDays(_time_) (_time_ / SECS_PER_DAY)
 
 class Uptime {
  public:
@@ -59,6 +59,7 @@ class Uptime {
     snprintf(_uptimeStr, sizeof(_uptimeStr), "%d Days %02d:%02d:%02d", days, hours, minutes, seconds);
     return _uptimeStr;
   }
+
  private:
   char _uptimeStr[18];
   uint64_t _uptime;

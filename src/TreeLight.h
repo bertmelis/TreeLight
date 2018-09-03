@@ -78,7 +78,7 @@ class TreeLightClass : public Print, public AsyncMqttClient {
   void loop();
 
  public:
-  void setNode(TreeLightNode& node, const char* value);
+  void setNode(TreeLightNode& node, const char* value);  // NOLINT
   void updateStats();
 
  private:

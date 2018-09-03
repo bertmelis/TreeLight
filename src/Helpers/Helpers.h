@@ -36,7 +36,7 @@ void removeSpace(char* source);
 // replace character with replacement directly in source
 void replaceChar(char* source, const char* character, const char* replacement);
 
-// find element 
+// find element
 template <typename T>
 std::pair<bool, int> findInVector(const std::vector<T>* v, const T el) {
   std::pair<bool, int> result;
@@ -52,6 +52,6 @@ std::pair<bool, int> findInVector(const std::vector<T>* v, const T el) {
 }
 
 template <typename T>
-void clearQueue(std::queue<T>& q) {
+void clearQueue(std::queue<T>& q) {  // NOLINT
   q = std::queue<T>();  // assign empty queue to q
 }
