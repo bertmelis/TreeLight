@@ -99,7 +99,7 @@ class TreeLightClass : public Print, public AsyncMqttClient {
   WiFiEventHandler _wiFiConnectedHandler;
   WiFiEventHandler _wiFiDisconnectedHandler;
   char _ssid[33];
-  char _pass[18];
+  char _pass[31];
   char _hostname[15];
   Ticker _timer;
   Uptime _uptime;
