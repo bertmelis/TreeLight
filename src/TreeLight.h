@@ -25,10 +25,17 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
+#ifndef TL_DEBUG
+#define TL_DEBUG 1
+#endif
+
 #include <vector>
 #include <queue>
 
 // Arduino framework
+#if TL_DEBUG
+#include <Arduino.h>
+#endif
 #if defined ARDUINO_ARCH_ESP32
 #include <WiFi.h>
 #include <Update.h>

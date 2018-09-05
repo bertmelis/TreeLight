@@ -79,6 +79,9 @@ void TreeLightClass::setupWiFi(const char* ssid, const char* pass) {
   WiFi.disconnect(true);
   _wiFiConnectedHandler = WiFi.onStationModeConnected(std::bind(&TreeLightClass::_onWiFiConnected, this, std::placeholders::_1));
   _wiFiDisconnectedHandler = WiFi.onStationModeDisconnected(std::bind(&TreeLightClass::_onWiFiDisconnected, this, std::placeholders::_1));
+#if TL_DEBUG
+  Serial.printf("Wifi setup done... (hostname: %s)\n", _hostname);
+#endif
 }
 
 void TreeLightClass::setupServer(uint16_t port) {
@@ -146,6 +149,9 @@ void TreeLightClass::setupServer(uint16_t port) {
   _webserver->onNotFound([](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "Not found");
   });
+#if TL_DEBUG
+  Serial.prinf("Webserver setup done... (port: %u)\n", port);
+#endif
 }
 
 void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
@@ -156,12 +162,21 @@ void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   AsyncMqttClient::setServer(broker, port);
   AsyncMqttClient::setKeepAlive(5);
   AsyncMqttClient::setCleanSession(true);
-  // set Will only on connect
+  static char topic[63] = {"\0"};  // setWill doesn't copy so make static to keep memory available
+  strncpy(topic, instance->_hostname, sizeof(topic) - 1);
+  strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
+  instance->AsyncMqttClient::setWill(topic, 1, true, "false");
+#if TL_DEBUG
+  Serial.printf("MQTT setup done... (broker: %s, port %u)\n", broker, port);
+#endif
 }
 
 void TreeLightClass::begin() {
   _timer.attach(10, &_connectToWiFi, this);
   _connectToWiFi(this);
+#if TL_DEBUG
+  Serial.print("Starting Treelight...");
+#endif
 }
 
 void TreeLightClass::loop() {
@@ -217,8 +232,14 @@ void TreeLightClass::updateStats() {
 void TreeLightClass::_connectToWiFi(TreeLightClass* instance) {
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.begin(instance->_ssid, instance->_pass);
+#if TL_DEBUG
+  Serial.print("connecting to WiFi\n");
+#endif
   } else {
     WiFi.disconnect();
+#if TL_DEBUG
+  Serial.print("WiFi connection reset\n");
+#endif
   }
 }
 
@@ -226,20 +247,25 @@ void TreeLightClass::_onWiFiConnected(const WiFiEventStationModeConnected& event
   _timer.detach();  // stop connecting to WiFi
   _timer.attach(10, &_connectToMqtt, this);
   _webserver->begin();
+#if TL_DEBUG
+  Serial.printf("WiFi connected, local IP: %s\n", WiFi.localIP().toString());
+#endif
 }
 
 void TreeLightClass::_onWiFiDisconnected(const WiFiEventStationModeDisconnected& event) {
   _timer.detach();  // stop connecting to Mqtt
   _timer.attach(10, &_connectToWiFi, this);
   _connectToWiFi(this);
+#if TL_DEBUG
+  Serial.print("WiFi disconnected\n");
+#endif
 }
 
 void TreeLightClass::_connectToMqtt(TreeLightClass* instance) {
-  static char topic[63] = {"\0"};  // setWill doesn't copy. Make static to keep memory available
-  strncpy(topic, instance->_hostname, sizeof(topic) - 1);
-  strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
-  instance->AsyncMqttClient::setWill(topic, 1, true, "false");
   instance->AsyncMqttClient::connect();
+#if TL_DEBUG
+  Serial.print("Connecting to MQTT\n");
+#endif
 }
 
 void TreeLightClass::_onMqttConnected() {
@@ -248,17 +274,25 @@ void TreeLightClass::_onMqttConnected() {
   strncpy(topic, _hostname, sizeof(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, "true");
+#if TL_DEBUG
+  Serial.print("connected to MQTT\n");
+#endif
 }
 
 void TreeLightClass::_onMqttDisconnected(AsyncMqttClientDisconnectReason reason) {
   if (!_flagForReboot) _timer.attach(10, &_connectToMqtt, this);
   // _connectToMqtt(this);
   Serial.println(static_cast<std::underlying_type<AsyncMqttClientDisconnectReason>::type>(reason));
+#if TL_DEBUG
+  Serial.print("MQTT disconnected\n");
+#endif
 }
 
 void TreeLightClass::_wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-    // client connected
+#if TL_DEBUG
+  Serial.print("Websocket client connected\n");
+#endif
     DynamicJsonBuffer jsonBuffer;
     JsonObject& root = jsonBuffer.createObject();
     root["type"] = "nodes";
@@ -279,6 +313,9 @@ void TreeLightClass::_wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* clie
     _updateStats(client);
   } else if (type == WS_EVT_DISCONNECT) {
     // client disconnected
+#if TL_DEBUG
+  Serial.print("Websocket client disconnected\n");
+#endif
   } else if (type == WS_EVT_DATA) {
     AwsFrameInfo * info = reinterpret_cast<AwsFrameInfo*>(arg);
     if (info->final && info->index == 0 && info->len == len) {
