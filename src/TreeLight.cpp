@@ -150,7 +150,7 @@ void TreeLightClass::setupServer(uint16_t port) {
     request->send(404, "text/plain", "Not found");
   });
 #if TL_DEBUG
-  Serial.prinf("Webserver setup done... (port: %u)\n", port);
+  Serial.printf("Webserver setup done... (port: %u)\n", port);
 #endif
 }
 
@@ -163,11 +163,11 @@ void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   AsyncMqttClient::setKeepAlive(5);
   AsyncMqttClient::setCleanSession(true);
   static char topic[63] = {"\0"};  // setWill doesn't copy so make static to keep memory available
-  strncpy(topic, instance->_hostname, sizeof(topic) - 1);
+  strncpy(topic, _hostname, sizeof(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   instance->AsyncMqttClient::setWill(topic, 1, true, "false");
 #if TL_DEBUG
-  Serial.printf("MQTT setup done... (broker: %s, port %u)\n", broker, port);
+  Serial.print("MQTT setup done...\n");
 #endif
 }
 
@@ -248,7 +248,7 @@ void TreeLightClass::_onWiFiConnected(const WiFiEventStationModeConnected& event
   _timer.attach(10, &_connectToMqtt, this);
   _webserver->begin();
 #if TL_DEBUG
-  Serial.printf("WiFi connected, local IP: %s\n", WiFi.localIP().toString());
+  Serial.print("WiFi connected\n");
 #endif
 }
 
