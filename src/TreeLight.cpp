@@ -165,7 +165,7 @@ void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   static char topic[63] = {"\0"};  // setWill doesn't copy so make static to keep memory available
   strncpy(topic, _hostname, sizeof(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
-  instance->AsyncMqttClient::setWill(topic, 1, true, "false");
+  AsyncMqttClient::setWill(topic, 1, true, "false");
 #if TL_DEBUG
   Serial.print("MQTT setup done...\n");
 #endif
