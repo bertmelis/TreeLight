@@ -135,7 +135,7 @@ function onMessage(message) {
           cell.id = data[i].name;
           document.getElementById(data[i].name).textContent = data[i].value;
           cell = row.insertCell(2);
-          if (data[i].set) {
+          if (data[i].settable) {
             cell.innerHTML = "<!-- add code to set value -->-";  // depends on this.type
           } else {
             cell.innerHTML = "-";

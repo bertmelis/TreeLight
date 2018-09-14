@@ -26,10 +26,13 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #pragma once
 
 #ifndef TL_DEBUG
-#define TL_DEBUG 1
+#define TL_DEBUG 0
 #endif
 
-#include <vector>
+#ifndef USE_STATS
+#define USE_STATS 1
+#endif
+
 #include <queue>
 
 // Arduino framework
@@ -53,26 +56,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include <AsyncMqttClient.h>
 
 // Internal
+#include "TreeLightNode.h"
+#if USE_STATS
 #include "Helpers/Uptime.h"
-
-enum TreeLightNodeType {
-  SWITCH,
-  NUMBER
-};
-
-class TreeLightNode {
-  friend class TreeLightClass;
- public:
-  TreeLightNode(const char* name, bool settable, TreeLightNodeType type);
-  ~TreeLightNode();
-  const char* getType() const;
-  const char* name;
-  char value[16];
-  bool settable;
-  const TreeLightNodeType type;
- private:
-  static std::vector<TreeLightNode*> _nodes;
-};
+#endif
 
 class TreeLightClass : public Print, public AsyncMqttClient {
  public:
@@ -87,22 +74,30 @@ class TreeLightClass : public Print, public AsyncMqttClient {
  public:
   TreeLightNode* findNode(const char* name);
   void setNode(TreeLightNode& node, const char* value);  // NOLINT
+#if USE_STATS
   void updateStats();
+#endif
 
  private:
   static void _connectToWiFi(TreeLightClass* instance);
+#if defined ARDUINO_ARCH_ESP32
+  static void _onWiFiEvent(TreeLightClass* instance, WiFiEvent_t event);
+#elif ARDUINO_ARCH_ESP8266
   void _onWiFiConnected(const WiFiEventStationModeConnected& event);
   void _onWiFiDisconnected(const WiFiEventStationModeDisconnected& event);
+  WiFiEventHandler _wiFiConnectedHandler;
+  WiFiEventHandler _wiFiDisconnectedHandler;
+#endif
   static void _connectToMqtt(TreeLightClass* instance);
   void _onMqttConnected();
   void _onMqttDisconnected(AsyncMqttClientDisconnectReason reason);
-  WiFiEventHandler _wiFiConnectedHandler;
-  WiFiEventHandler _wiFiDisconnectedHandler;
   char _ssid[33];
-  char _pass[31];
-  char _hostname[15];
+  char _pass[65];
+  char _hostname[33];
   Ticker _timer;
+#if USE_STATS
   Uptime _uptime;
+#endif
 
  private:
   AsyncWebServer* _webserver;
@@ -110,7 +105,9 @@ class TreeLightClass : public Print, public AsyncMqttClient {
   bool _flagForReboot;
   void _wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len);
   void _mqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+#if USE_STATS
   void _updateStats(AsyncWebSocketClient* client = nullptr);
+#endif
 
  public:
   size_t write(uint8_t character);

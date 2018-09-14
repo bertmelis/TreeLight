@@ -27,31 +27,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Helpers/Helpers.h"
 #include "html.h"
 
-std::vector<TreeLightNode*> TreeLightNode::_nodes;
-
-TreeLightNode::TreeLightNode(const char* name, bool settable, TreeLightNodeType type) :
-  name(name),
-  value{""},
-  settable(settable),
-  type(type) {
-    _nodes.push_back(this);
-}
-
-TreeLightNode::~TreeLightNode() {
-  std::pair<bool, int> result = findInVector(&_nodes, this);
-  _nodes.erase(_nodes.begin() + result.second);
-}
-
-const char* TreeLightNode::getType() const {
-  switch (type) {
-    case SWITCH:
-      return "SWITCH";
-    case NUMBER:
-      return "NUMBER";
-  }
-  return {"\0"};
-}
-
 TreeLightClass TreeLight;
 
 TreeLightClass::TreeLightClass() :
@@ -59,10 +34,17 @@ TreeLightClass::TreeLightClass() :
   _pass{"\0"},
   _hostname{"\0"},
   _timer(),
+#if USE_STATS
+  _uptime(),
+#endif
   _webserver(nullptr),
   _websocket(nullptr),
   _flagForReboot(false) {
+#if defined ARDUINO_ARCH_ESP32
+    snprintf(_hostname, sizeof(_hostname), "esp32-%06x", ESP.getEfuseMac());
+#elif defined ARDUINO_ARCH_ESP8266
     snprintf(_hostname, sizeof(_hostname), "esp8266-%06x", ESP.getChipId());
+#endif
   }
 
 void TreeLightClass::setHostname(const char* hostname) {
@@ -73,14 +55,20 @@ void TreeLightClass::setupWiFi(const char* ssid, const char* pass) {
   strncpy(_ssid, ssid, sizeof(_ssid)-1);
   strncpy(_pass, pass, sizeof(_pass)-1);
   WiFi.mode(WIFI_STA);
+#if defined ARDUINO_ARCH_ESP8266
   WiFi.hostname(_hostname);
+#endif
   WiFi.setAutoConnect(false);
   WiFi.setAutoReconnect(false);
   WiFi.disconnect(true);
+#if defined ARDUINO_ARCH_ESP32
+  WiFi.onEvent(std::bind(&TreeLightClass::_onWiFiEvent, this, std::placeholders::_1));
+#elif defined ARDUINO_ARCH_ESP8266
   _wiFiConnectedHandler = WiFi.onStationModeConnected(std::bind(&TreeLightClass::_onWiFiConnected, this, std::placeholders::_1));
   _wiFiDisconnectedHandler = WiFi.onStationModeDisconnected(std::bind(&TreeLightClass::_onWiFiDisconnected, this, std::placeholders::_1));
+#endif
 #if TL_DEBUG
-  Serial.printf("Wifi setup done... (hostname: %s)\n", _hostname);
+  TL_DEBUG.printf("Wifi setup done... (hostname: %s)\n", _hostname);
 #endif
 }
 
@@ -150,7 +138,7 @@ void TreeLightClass::setupServer(uint16_t port) {
     request->send(404, "text/plain", "Not found");
   });
 #if TL_DEBUG
-  Serial.printf("Webserver setup done... (port: %u)\n", port);
+  TL_DEBUG.printf("Webserver setup done... (port: %u)\n", port);
 #endif
 }
 
@@ -167,7 +155,7 @@ void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::setWill(topic, 1, true, "false");
 #if TL_DEBUG
-  Serial.print("MQTT setup done...\n");
+  TL_DEBUG.print("MQTT setup done...\n");
 #endif
 }
 
@@ -175,7 +163,7 @@ void TreeLightClass::begin() {
   _timer.attach(10, &_connectToWiFi, this);
   _connectToWiFi(this);
 #if TL_DEBUG
-  Serial.print("Starting Treelight...");
+  TL_DEBUG.print("Starting Treelight...");
 #endif
 }
 
@@ -190,8 +178,8 @@ void TreeLightClass::loop() {
   if (_flagForReboot) {
     AsyncMqttClient::disconnect();
     this->println("Preparing for reboot");
-    uint8_t timer = 2;
-    while (--timer) delay(1000);
+    uint16_t timer = 1000;
+    while (--timer) delay(2);
     ESP.restart();
   }
 }
@@ -225,30 +213,59 @@ void TreeLightClass::setNode(TreeLightNode& node, const char* value) {  // NOLIN
   AsyncMqttClient::publish(topic, 1, true, node.value);
 }
 
+#if USE_STATS
 void TreeLightClass::updateStats() {
   _updateStats();
 }
+#endif
 
 void TreeLightClass::_connectToWiFi(TreeLightClass* instance) {
   if (WiFi.status() != WL_CONNECTED) {
     WiFi.begin(instance->_ssid, instance->_pass);
+#if defined ARDUINO_ARCH_ESP32
+    WiFi.setHostname(instance->_hostname);
+#endif
 #if TL_DEBUG
-  Serial.print("connecting to WiFi\n");
+  TL_DEBUG.print("connecting to WiFi\n");
 #endif
   } else {
     WiFi.disconnect();
 #if TL_DEBUG
-  Serial.print("WiFi connection reset\n");
+  TL_DEBUG.print("WiFi connection reset\n");
 #endif
   }
 }
 
+#if defined ARDUINO_ARCH_ESP32
+void TreeLightClass::_onWiFiEvent(TreeLightClass* instance, WiFiEvent_t event) {
+  switch (event) {
+    case SYSTEM_EVENT_STA_GOT_IP:
+      instance->_timer.detach();  // stop connecting to WiFi
+      instance->_timer.attach(10, &_connectToMqtt, instance);
+      instance->_webserver->begin();
+#if TL_DEBUG
+      TL_DEBUG.print("WiFi connected\n");
+#endif
+      break;
+    case SYSTEM_EVENT_STA_DISCONNECTED:
+      instance->_timer.detach();  // stop connecting to Mqtt
+      instance->_timer.attach(10, &_connectToWiFi, instance);
+      instance->_connectToWiFi(instance);
+#if TL_DEBUG
+      TL_DEBUG.print("WiFi disconnected\n");
+#endif
+      break;
+    default:
+      break;
+  }
+}
+#elif defined ARDUINO_ARCH_ESP8266
 void TreeLightClass::_onWiFiConnected(const WiFiEventStationModeConnected& event) {
   _timer.detach();  // stop connecting to WiFi
   _timer.attach(10, &_connectToMqtt, this);
   _webserver->begin();
 #if TL_DEBUG
-  Serial.print("WiFi connected\n");
+  TL_DEBUG.print("WiFi connected\n");
 #endif
 }
 
@@ -257,14 +274,15 @@ void TreeLightClass::_onWiFiDisconnected(const WiFiEventStationModeDisconnected&
   _timer.attach(10, &_connectToWiFi, this);
   _connectToWiFi(this);
 #if TL_DEBUG
-  Serial.print("WiFi disconnected\n");
+  TL_DEBUG.print("WiFi disconnected\n");
 #endif
 }
+#endif
 
 void TreeLightClass::_connectToMqtt(TreeLightClass* instance) {
   instance->AsyncMqttClient::connect();
 #if TL_DEBUG
-  Serial.print("Connecting to MQTT\n");
+  TL_DEBUG.print("Connecting to MQTT\n");
 #endif
 }
 
@@ -275,23 +293,23 @@ void TreeLightClass::_onMqttConnected() {
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, "true");
 #if TL_DEBUG
-  Serial.print("connected to MQTT\n");
+  TL_DEBUG.print("connected to MQTT\n");
 #endif
 }
 
 void TreeLightClass::_onMqttDisconnected(AsyncMqttClientDisconnectReason reason) {
   if (!_flagForReboot) _timer.attach(10, &_connectToMqtt, this);
   // _connectToMqtt(this);
-  Serial.println(static_cast<std::underlying_type<AsyncMqttClientDisconnectReason>::type>(reason));
 #if TL_DEBUG
-  Serial.print("MQTT disconnected\n");
+  TL_DEBUG.print("MQTT disconnected");
+  TL_DEBUG.println(static_cast<std::underlying_type<AsyncMqttClientDisconnectReason>::type>(reason));
 #endif
 }
 
 void TreeLightClass::_wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len) {
   if (type == WS_EVT_CONNECT) {
 #if TL_DEBUG
-  Serial.print("Websocket client connected\n");
+  TL_DEBUG.print("Websocket client connected\n");
 #endif
     DynamicJsonBuffer jsonBuffer;
     JsonObject& root = jsonBuffer.createObject();
@@ -302,7 +320,13 @@ void TreeLightClass::_wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* clie
       object["name"] = n->name;
       object["value"] = n->value;
       object["type"] = n->getType();
-      object["set"] = n->settable;
+      object["settable"] = n->settable;
+      if (n->settable && n->type == NUMBER) {
+        JsonObject& set = object.createNestedObject("set");
+        set["min"] = reinterpret_cast<TL_NumberNode*>(n)->min;
+        set["step"] = reinterpret_cast<TL_NumberNode*>(n)->step;
+        set["max"] = reinterpret_cast<TL_NumberNode*>(n)->max;
+      }
     }
     size_t len = root.measureLength();
     AsyncWebSocketMessageBuffer* buffer = _websocket->makeBuffer(len);
@@ -310,11 +334,13 @@ void TreeLightClass::_wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* clie
       root.printTo(reinterpret_cast<char*>(buffer->get()), len + 1);
       client->text(buffer);
     }
+#if USE_STATS
     _updateStats(client);
+#endif
   } else if (type == WS_EVT_DISCONNECT) {
     // client disconnected
 #if TL_DEBUG
-  Serial.print("Websocket client disconnected\n");
+  TL_DEBUG.print("Websocket client disconnected\n");
 #endif
   } else if (type == WS_EVT_DATA) {
     AwsFrameInfo * info = reinterpret_cast<AwsFrameInfo*>(arg);
@@ -344,6 +370,7 @@ void TreeLightClass::_mqttMessage(char* topic, char* payload, AsyncMqttClientMes
   // to be implemented
 }
 
+#if USE_STATS
 void TreeLightClass::_updateStats(AsyncWebSocketClient* client) {
     StaticJsonBuffer<200> jsonBuffer;
   JsonObject& root = jsonBuffer.createObject();
@@ -388,6 +415,7 @@ void TreeLightClass::_updateStats(AsyncWebSocketClient* client) {
     }
   }
 }
+#endif
 
 size_t TreeLightClass::write(uint8_t str) {
   _messageBuffer.push(str);
