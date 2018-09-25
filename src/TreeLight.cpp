@@ -27,19 +27,21 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #include "Helpers/Helpers.h"
 #include "html.h"
 
-TreeLightClass TreeLight;
+TreeLightClass& TreeLight = TreeLightClass::get();
 
 TreeLightClass::TreeLightClass() :
   _ssid{"\0"},
   _pass{"\0"},
   _hostname{"\0"},
   _timer(),
+  _webserver(nullptr),
+  _websocket(nullptr),
+  _flagForReboot(false),
 #if USE_STATS
   _uptime(),
 #endif
-  _webserver(nullptr),
-  _websocket(nullptr),
-  _flagForReboot(false) {
+  _lastMessagesSend(0),
+  _messageBuffer() {
 #if defined ARDUINO_ARCH_ESP32
     snprintf(_hostname, sizeof(_hostname), "esp32-%06x", ESP.getEfuseMac());
 #elif defined ARDUINO_ARCH_ESP8266
@@ -67,9 +69,6 @@ void TreeLightClass::setupWiFi(const char* ssid, const char* pass) {
   _wiFiConnectedHandler = WiFi.onStationModeConnected(std::bind(&TreeLightClass::_onWiFiConnected, this, std::placeholders::_1));
   _wiFiDisconnectedHandler = WiFi.onStationModeDisconnected(std::bind(&TreeLightClass::_onWiFiDisconnected, this, std::placeholders::_1));
 #endif
-#if TL_DEBUG
-  TL_DEBUG.printf("Wifi setup done... (hostname: %s)\n", _hostname);
-#endif
 }
 
 void TreeLightClass::setupServer(uint16_t port) {
@@ -84,11 +83,9 @@ void TreeLightClass::setupServer(uint16_t port) {
     });
     request->send(response);
   });
-  /*
   _webserver->on("/script.js", HTTP_GET, [this](AsyncWebServerRequest *request) {
     request->send_P(200, "text/javascript", script_js);
   });
-  */
   _webserver->on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request) {
     AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon_ico_gz, favicon_ico_gz_len);
     response->addHeader("Content-Encoding", "gzip");
@@ -131,21 +128,18 @@ void TreeLightClass::setupServer(uint16_t port) {
         }
       }
     });
-  _websocket->onEvent(std::bind(&TreeLightClass::_wsEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+  _websocket->onEvent(std::bind(&TreeLightClass::_onWsEvent, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
                                                                  std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
   _webserver->addHandler(_websocket);
   _webserver->onNotFound([](AsyncWebServerRequest *request){
     request->send(404, "text/plain", "Not found");
   });
-#if TL_DEBUG
-  TL_DEBUG.printf("Webserver setup done... (port: %u)\n", port);
-#endif
 }
 
 void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   AsyncMqttClient::onConnect(std::bind(&TreeLightClass::_onMqttConnected, this));
   AsyncMqttClient::onDisconnect(std::bind(&TreeLightClass::_onMqttDisconnected, this, std::placeholders::_1));
-  AsyncMqttClient::onMessage(std::bind(&TreeLightClass::_mqttMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
+  AsyncMqttClient::onMessage(std::bind(&TreeLightClass::_onMqttMessage, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3,
                                                                              std::placeholders::_4, std::placeholders::_5, std::placeholders::_6));
   AsyncMqttClient::setServer(broker, port);
   AsyncMqttClient::setKeepAlive(5);
@@ -154,17 +148,11 @@ void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   strncpy(topic, _hostname, sizeof(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::setWill(topic, 1, true, "false");
-#if TL_DEBUG
-  TL_DEBUG.print("MQTT setup done...\n");
-#endif
 }
 
 void TreeLightClass::begin() {
   _timer.attach(10, &_connectToWiFi, this);
   _connectToWiFi(this);
-#if TL_DEBUG
-  TL_DEBUG.print("Starting Treelight...");
-#endif
 }
 
 void TreeLightClass::loop() {
@@ -184,35 +172,6 @@ void TreeLightClass::loop() {
   }
 }
 
-TreeLightNode* TreeLightClass::findNode(const char* name) {
-  for (TreeLightNode* n : TreeLightNode::_nodes) {
-    if (strcmp(n->name, name) == 0) return n;
-  }
-  return nullptr;
-}
-
-void TreeLightClass::setNode(TreeLightNode& node, const char* value) {  // NOLINT
-  strncpy(node.value, value, sizeof(node.value)-1);
-  DynamicJsonBuffer jsonBuffer;
-  JsonObject& root = jsonBuffer.createObject();
-  root["type"] = "nodes";
-  JsonArray& array = root.createNestedArray("data");
-  JsonObject& object = array.createNestedObject();
-  object["name"] = node.name;
-  object["value"] = node.value;
-  size_t len = root.measureLength();
-  AsyncWebSocketMessageBuffer* buffer = _websocket->makeBuffer(len);
-  if (buffer) {
-    root.printTo(reinterpret_cast<char*>(buffer->get()), len + 1);
-    _websocket->textAll(buffer);
-  }
-  char topic[63] = {"\0"};
-  strncpy(topic, _hostname, sizeof(topic) - 1);
-  strncat(topic, "/", sizeof(topic) - strlen(topic) - 1);
-  strncat(topic, node.name, sizeof(topic) - strlen(topic) - 1);
-  AsyncMqttClient::publish(topic, 1, true, node.value);
-}
-
 #if USE_STATS
 void TreeLightClass::updateStats() {
   _updateStats();
@@ -225,14 +184,8 @@ void TreeLightClass::_connectToWiFi(TreeLightClass* instance) {
 #if defined ARDUINO_ARCH_ESP32
     WiFi.setHostname(instance->_hostname);
 #endif
-#if TL_DEBUG
-  TL_DEBUG.print("connecting to WiFi\n");
-#endif
   } else {
     WiFi.disconnect();
-#if TL_DEBUG
-  TL_DEBUG.print("WiFi connection reset\n");
-#endif
   }
 }
 
@@ -243,17 +196,11 @@ void TreeLightClass::_onWiFiEvent(TreeLightClass* instance, WiFiEvent_t event) {
       instance->_timer.detach();  // stop connecting to WiFi
       instance->_timer.attach(10, &_connectToMqtt, instance);
       instance->_webserver->begin();
-#if TL_DEBUG
-      TL_DEBUG.print("WiFi connected\n");
-#endif
       break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
       instance->_timer.detach();  // stop connecting to Mqtt
       instance->_timer.attach(10, &_connectToWiFi, instance);
       instance->_connectToWiFi(instance);
-#if TL_DEBUG
-      TL_DEBUG.print("WiFi disconnected\n");
-#endif
       break;
     default:
       break;
@@ -264,26 +211,17 @@ void TreeLightClass::_onWiFiConnected(const WiFiEventStationModeConnected& event
   _timer.detach();  // stop connecting to WiFi
   _timer.attach(10, &_connectToMqtt, this);
   _webserver->begin();
-#if TL_DEBUG
-  TL_DEBUG.print("WiFi connected\n");
-#endif
 }
 
 void TreeLightClass::_onWiFiDisconnected(const WiFiEventStationModeDisconnected& event) {
   _timer.detach();  // stop connecting to Mqtt
   _timer.attach(10, &_connectToWiFi, this);
   _connectToWiFi(this);
-#if TL_DEBUG
-  TL_DEBUG.print("WiFi disconnected\n");
-#endif
 }
 #endif
 
 void TreeLightClass::_connectToMqtt(TreeLightClass* instance) {
   instance->AsyncMqttClient::connect();
-#if TL_DEBUG
-  TL_DEBUG.print("Connecting to MQTT\n");
-#endif
 }
 
 void TreeLightClass::_onMqttConnected() {
@@ -292,82 +230,39 @@ void TreeLightClass::_onMqttConnected() {
   strncpy(topic, _hostname, sizeof(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, "true");
-#if TL_DEBUG
-  TL_DEBUG.print("connected to MQTT\n");
-#endif
+  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncat(topic, "/+/set", sizeof(topic) - strlen(topic) - 1);
+  AsyncMqttClient::subscribe(topic, 1);
 }
 
 void TreeLightClass::_onMqttDisconnected(AsyncMqttClientDisconnectReason reason) {
   if (!_flagForReboot) _timer.attach(10, &_connectToMqtt, this);
   // _connectToMqtt(this);
-#if TL_DEBUG
-  TL_DEBUG.print("MQTT disconnected");
-  TL_DEBUG.println(static_cast<std::underlying_type<AsyncMqttClientDisconnectReason>::type>(reason));
-#endif
 }
 
-void TreeLightClass::_wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len) {
+void TreeLightClass::_onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
+  // message is assumed to arrive completely in one packet
+  TreeLightNode::parseMqtt(topic, payload, len);
+}
+
+void TreeLightClass::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len) {
   if (type == WS_EVT_CONNECT) {
-#if TL_DEBUG
-  TL_DEBUG.print("Websocket client connected\n");
-#endif
-    DynamicJsonBuffer jsonBuffer;
-    JsonObject& root = jsonBuffer.createObject();
-    root["type"] = "nodes";
-    JsonArray& array = root.createNestedArray("data");
-    for (TreeLightNode* n : TreeLightNode::_nodes) {
-      JsonObject& object = array.createNestedObject();
-      object["name"] = n->name;
-      object["value"] = n->value;
-      object["type"] = n->getType();
-      object["settable"] = n->settable;
-      if (n->settable && n->type == NUMBER) {
-        JsonObject& set = object.createNestedObject("set");
-        set["min"] = reinterpret_cast<TL_NumberNode*>(n)->min;
-        set["step"] = reinterpret_cast<TL_NumberNode*>(n)->step;
-        set["max"] = reinterpret_cast<TL_NumberNode*>(n)->max;
-      }
-    }
-    size_t len = root.measureLength();
-    AsyncWebSocketMessageBuffer* buffer = _websocket->makeBuffer(len);
-    if (buffer) {
-      root.printTo(reinterpret_cast<char*>(buffer->get()), len + 1);
-      client->text(buffer);
-    }
+    TreeLightNode::sendNodes(client);
 #if USE_STATS
     _updateStats(client);
 #endif
   } else if (type == WS_EVT_DISCONNECT) {
     // client disconnected
-#if TL_DEBUG
-  TL_DEBUG.print("Websocket client disconnected\n");
-#endif
   } else if (type == WS_EVT_DATA) {
     AwsFrameInfo * info = reinterpret_cast<AwsFrameInfo*>(arg);
     if (info->final && info->index == 0 && info->len == len) {
       // the whole message is in a single frame and we got all of it's data
       // info->opcode == WS_TEXT is assumed
-      DynamicJsonBuffer jsonBuffer;
-      data[len] = 0;
-      JsonObject& root = jsonBuffer.parseObject(data);
-      if (root.success()) {
-        /* parse json and launch action
-        if (strcmp(root["action"], "updateNode") == 0) {
-          ITreeLightNode* ptr = ITreeLightNode::getNode(root["id"]);
-          if (ptr) ptr->callback(root["value"]);
-        } else if (strcmp(root["action"], "getNodes") == 0) {
-          _sendNodes(client);
-        }
-        */
-      }
+      TreeLightNode::parseJson(reinterpret_cast<char*>(data), len);
     } else {
-      // this should not happen. aka not implemented
+      // multi-packet message? This should not happen.
     }
   }
-}
-
-void TreeLightClass::_mqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total) {
-  // to be implemented
 }
 
 #if USE_STATS
