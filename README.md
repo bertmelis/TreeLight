@@ -38,7 +38,7 @@ If you still can't figure out how to use, please create an issue.
 I created this library for my own personal needs. As the MIT license states, it comes with no warranty or fit for purpose. If it doesn't fit your use case, feel free to fork/copy/adapt/change... I do like to have some credit and maybe you can share your improvements?
 
 This library is still in developement. Next on the to do list are:
-- add ESP32 support
-- enable settable values from webpage
-- enable settable values from MQTT
+- ESP32 support --> didn't test, but compiles!
+- ~enable settable values from webpage~
+- ~enable settable values from MQTT~
 - enable changing WiFi and MQTT parameters
