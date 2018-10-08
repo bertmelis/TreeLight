@@ -11,8 +11,8 @@ float humidity = 0.0;
 Ticker timer1;
 
 // TreeLight
-TreeLightNode temp("temperature", false, NUMBER);
-TreeLightNode humid("humidity", false, NUMBER);
+FloatNode tempNode("temperature", false);
+FloatNode humidNode("humidity", false);
 Ticker timer2;
 volatile bool updateStats = false;
 
@@ -45,13 +45,8 @@ void loop() {
   TreeLight.loop();
   if (result > 0) {
     result = 0;
-    temperature = sensor.getTemperature();
-    char val[6] = {"\0"};
-    snprintf(val, sizeof(val), "%.1f°C", temperature);
-    TreeLight.setNode(temp, String(temperature, 1).c_str());
-    humidity = sensor.getHumidity();
-    snprintf(val, sizeof(val), "%.1f°C", humidity);
-    TreeLight.setNode(humid, String(humidity, 1).c_str());
+    tempNode.setValue(sensor.getTemperature());
+    humidNode.setValue(sensor.getHumidity());
   } else if (result < 0) {
     result = 0;
     TreeLight.printf("Error: %s\n", sensor.getError());

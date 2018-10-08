@@ -1,5 +1,7 @@
 # TreeLight
 
+[![Build Status](https://travis-ci.com/bertmelis/TreeLight.svg?branch=master)](https://travis-ci.com/bertmelis/TreeLight)
+
 Don't loose any time connecting your ESP8266 to MQTT. Just include this lib and with minimal extra code, your device is up and running.
 It comes with a handy webpage too so you can have a quick look at the status of your device.
 
