@@ -9,17 +9,18 @@ cache:
         - "~/.platformio"
 
 env:
-    - PLATFORMIO_CI_SRC=examples/dht/dht.ino PLATFORMIO_CI_EXTRA_ARGS="--board=d1_mini"
-    - PLATFORMIO_CI_SRC=examples/blinker/blinker.ino PLATFORMIO_CI_EXTRA_ARGS="--board=lolin32"
+    - PLATFORMIO_CI_SRC=examples/dht/dht.ino PLATFORMIO_CI_EXTRA_ARGS="--board=d1_mini --project-conf=./pioESP8266.ini"
+    - PLATFORMIO_CI_SRC=examples/blinker/blinker.ino PLATFORMIO_CI_EXTRA_ARGS="--board=lolin32 --project-conf=./pioESP32.ini"
     - CPPLINT=true
 
 install:
     - pip install -U platformio
     - platformio lib install 5495
+    - platformio lib -g install file://.
     - pip install -U cpplint
 
 script:
-    - if [[ "$CPPLINT" ]]; then cpplint --repository=. --recursive --linelength=200 --filter=-build/include  ./src; else platformio ci --lib="." --project-conf=./platformio.ini $PLATFORMIO_CI_EXTRA_ARGS; fi
+    - if [[ "$CPPLINT" ]]; then cpplint --repository=. --recursive --linelength=200 --filter=-build/include  ./src; else platformio ci --lib="." $PLATFORMIO_CI_EXTRA_ARGS; fi
 
 notifications:
   email:
