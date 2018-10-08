@@ -25,37 +25,90 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#include <vector>
+#include <Arduino.h>
 
-enum TreeLightNodeType {
-  SWITCH,
-  NUMBER
-};
+#include <vector>
+#include <functional>
+
+#include <ArduinoJson.h>
+
+#include "TreeLight.h"
+#include "Helpers/Helpers.h"
 
 class TreeLightNode {
-  friend class TreeLightClass;
  public:
-  TreeLightNode(const char* name, bool settable, TreeLightNodeType type);
+  TreeLightNode(const char* name, bool settable);
   ~TreeLightNode();
-  const char* getType() const;
-  const char* name;
-  char value[16];
-  bool settable;
-  const TreeLightNodeType type;
+  static void parseJson(char* json, size_t length);
+  static void parseMqtt(char* topic, char* payload, size_t len);
+  virtual void runJson(JsonVariant payload) = 0;
+  virtual void runMqtt(char* payload, size_t length) = 0;
+  static void sendNodes(AsyncWebSocketClient* client);
+
+ protected:
+  static TreeLightNode* _findNode(const char* name);
+  virtual void getNode(JsonObject* object) = 0;
+  void sendNode(const JsonObject& nodeData, const char* value);
+
+ protected:
+  const char* _name;
+  bool _settable;
+
  private:
   static std::vector<TreeLightNode*> _nodes;
 };
 
-class TL_SwitchNode : public TreeLightNode {
+class BoolNode : public TreeLightNode {
  public:
-  TL_SwitchNode(const char* name, bool settable);
+  BoolNode(const char* name, bool settable);
+  void setValue(bool value);
+  void onMessage(std::function<void(bool)> handler);
+  void runJson(JsonVariant payload);
+  void runMqtt(char* payload, size_t length);
+ protected:
+  void getNode(JsonObject* object);
+
+ private:
+  bool _value;
+  std::function<void(bool)> _handler;
 };
 
-class TL_NumberNode : public TreeLightNode {
+class IntNode : public TreeLightNode {
  public:
-  TL_NumberNode(const char* name, bool settable);
-  void setProperties(float min, float step, float max);
-  float min;
-  float step;
-  float max;
+  IntNode(const char* name, bool settable);
+  void setValue(int32_t value);
+  void onMessage(std::function<void(int32_t)> handler);
+  void runJson(JsonVariant payload);
+  void runMqtt(char* payload, size_t length);
+  void setRange(int32_t min, int32_t step, int32_t max);
+
+ protected:
+  void getNode(JsonObject* object);
+
+ protected:
+  int32_t _value;
+  int32_t _minimum;
+  int32_t _step;
+  int32_t _maximum;
+  std::function<void(int32_t)> _handler;
+};
+
+class FloatNode : public TreeLightNode {
+ public:
+  FloatNode(const char* name, bool settable);
+  void setValue(float value);
+  void onMessage(std::function<void(float)> handler);
+  void runJson(JsonVariant payload);
+  void runMqtt(char* payload, size_t length);
+  void setRange(float min, float step, float max);
+
+ protected:
+  void getNode(JsonObject* object);
+
+ protected:
+  float _value;
+  float _minimum;
+  float _step;
+  float _maximum;
+  std::function<void(float)> _handler;
 };

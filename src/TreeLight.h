@@ -25,10 +25,6 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 #pragma once
 
-#ifndef TL_DEBUG
-#define TL_DEBUG 0
-#endif
-
 #ifndef USE_STATS
 #define USE_STATS 1
 #endif
@@ -62,18 +58,28 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #endif
 
 class TreeLightClass : public Print, public AsyncMqttClient {
- public:
+  friend class TreeLightNode;
+
+ private:
   TreeLightClass();
+  TreeLightClass(const TreeLightClass &rhs);
+  TreeLightClass& operator=(const TreeLightClass &rhs);
+
+ public:
+  inline static TreeLightClass& get(void) {
+    static TreeLightClass instance;
+    return instance;
+  }
+
+ public:
   void setHostname(const char* hostname);
   void setupWiFi(const char* ssid, const char* pass);
-  void setupServer(uint16_t port = 80);  // defaults to 80
+  void setupServer(uint16_t port = 80);
   void setupMqtt(const IPAddress broker, const uint16_t port = 1883);
   void begin();
   void loop();
 
  public:
-  TreeLightNode* findNode(const char* name);
-  void setNode(TreeLightNode& node, const char* value);  // NOLINT
 #if USE_STATS
   void updateStats();
 #endif
@@ -91,22 +97,18 @@ class TreeLightClass : public Print, public AsyncMqttClient {
   static void _connectToMqtt(TreeLightClass* instance);
   void _onMqttConnected();
   void _onMqttDisconnected(AsyncMqttClientDisconnectReason reason);
+  void _onMqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
+  void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len);
   char _ssid[33];
   char _pass[65];
   char _hostname[33];
   Ticker _timer;
-#if USE_STATS
-  Uptime _uptime;
-#endif
-
- private:
   AsyncWebServer* _webserver;
   AsyncWebSocket* _websocket;
   bool _flagForReboot;
-  void _wsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client, AwsEventType type, void* arg, uint8_t* data, size_t len);
-  void _mqttMessage(char* topic, char* payload, AsyncMqttClientMessageProperties properties, size_t len, size_t index, size_t total);
 #if USE_STATS
   void _updateStats(AsyncWebSocketClient* client = nullptr);
+  Uptime _uptime;
 #endif
 
  public:
@@ -118,4 +120,4 @@ class TreeLightClass : public Print, public AsyncMqttClient {
   std::queue<uint8_t> _messageBuffer;
 };
 
-extern TreeLightClass TreeLight;
+extern TreeLightClass& TreeLight;
