@@ -11,8 +11,8 @@ float humidity = 0.0;
 Ticker timer1;
 
 // TreeLight
-FloatNode tempNode("temperature", false, NUMBER);
-FloatNode humidNode("humidity", false, NUMBER);
+FloatNode tempNode("temperature", false);
+FloatNode humidNode("humidity", false);
 Ticker timer2;
 volatile bool updateStats = false;
 
