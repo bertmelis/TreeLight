@@ -19,7 +19,7 @@ install:
     - pip install -U cpplint
 
 script:
-    - if [[ "$CPPLINT" ]]; then cpplint --repository=. --recursive --linelength=200 --filter=-build/include  ./src; else platformio ci --lib="." --project-conf=./platoformio.ini $PLATFORMIO_CI_EXTRA_ARGS; fi
+    - if [[ "$CPPLINT" ]]; then cpplint --repository=. --recursive --linelength=200 --filter=-build/include  ./src; else platformio ci --lib="." --project-conf=./platformio.ini $PLATFORMIO_CI_EXTRA_ARGS; fi
 
 notifications:
   email:
