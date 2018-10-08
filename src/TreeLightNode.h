@@ -65,6 +65,7 @@ class BoolNode : public TreeLightNode {
   void onMessage(std::function<void(bool)> handler);
   void runJson(JsonVariant payload);
   void runMqtt(char* payload, size_t length);
+
  protected:
   void getNode(JsonObject* object);
 
@@ -111,4 +112,27 @@ class FloatNode : public TreeLightNode {
   float _step;
   float _maximum;
   std::function<void(float)> _handler;
+};
+
+#ifndef MAX_ENUM_LENGTH
+#define MAX_ENUM_LENGTH 33
+#endif
+
+class EnumNode : public TreeLightNode {
+ public:
+  EnumNode(const char* name, bool settable);
+  void setValue(const char* value);
+  void onMessage(std::function<void(const char*)> handler);
+  void runJson(JsonVariant payload);
+  void runMqtt(char* payload, size_t length);
+  void setEnum(const char** range, size_t length);
+
+ protected:
+  void getNode(JsonObject* object);
+
+ private:
+  char _value[MAX_ENUM_LENGTH];
+  const char** _range;
+  size_t _length;
+  std::function<void(const char*)> _handler;
 };

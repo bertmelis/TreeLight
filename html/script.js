@@ -126,6 +126,60 @@ FloatNode.prototype.change = function(element) {
   message.data.value = parseFloat(element.value);
   ws.send(JSON.stringify(message));
 };
+function EnumNode(name, value, settable, set) {
+  Node.call(this, name, value, settable);
+  this.set = set;
+}
+EnumNode.prototype = Object.create(Node.prototype);
+EnumNode.prototype.draw = function() {
+  // check if elementId already exists
+  if (document.getElementById(this.name)) {
+    document.getElementById(this.name).textContent = this.value;
+    if (this.settable) {
+      var options = document.getElementById(`input_${this.name}`).getElementsByTagName('OPTION');
+      for (var i=0; i < options.length; i++){
+        options[i].selected = false;
+      }
+      document.getElementById("inputVal_" + this.value).selected = true;
+    }
+  // else add it to the table
+  } else {
+    let table = document.getElementById("mqtt").getElementsByTagName("tbody")[0];
+    let row = table.insertRow(-1);
+    let cell = row.insertCell(0);
+    cell.textContent = this.name;
+    cell = row.insertCell(1);
+    cell.id = this.name;
+    document.getElementById(this.name).textContent = this.value;
+    cell = row.insertCell(2);
+    var html;
+    if (this.settable) {
+      html = `<select id="input_${this.name}" onChange="updateValue(this, '${this.name}')">`;
+      for (var i = 0; i < Object.keys(this.set).length; ++i) {
+        html += `<option id="inputVal_${this.set[i]}" value="${this.set[i]}"`;
+        if (this.value == this.set[i]) html += ` selected`;
+        html += `>${this.set[i]}</option>`;
+      }
+      html += `</select>`;
+    } else {
+      html = "<!-- not settable -->";
+    }
+    cell.innerHTML = html;
+  }
+};
+EnumNode.prototype.change = function(element) {
+  var message = {};
+  message.type = "nodes";
+  message.data = {};
+  message.data.name = this.name;
+  message.data.value = element.value;
+  var options =element.getElementsByTagName('OPTION');
+  for (var i=0; i < options.length; i++){
+    options[i].selected = false;
+  }
+  document.getElementById("inputVal_" + this.value).selected = true;
+  ws.send(JSON.stringify(message));
+};
 
 function validJSON(jsonString) {
   try {
@@ -177,7 +231,11 @@ function onMessage(message){
                 nodes[data.name] = new IntNode(data.name, data.value, data.settable, data.set);
                 break;
               case "FLOAT":
-              nodes[data.name] = new FloatNode(data.name, data.value, data.settable, data.set);
+                nodes[data.name] = new FloatNode(data.name, data.value, data.settable, data.set);
+                break;
+              case "ENUM":
+              console.log(message);
+                nodes[data.name] = new EnumNode(data.name, data.value, data.settable, data.set);
                 break;
             }
             nodes[data.name].draw();
