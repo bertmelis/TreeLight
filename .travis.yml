@@ -17,10 +17,12 @@ env:
 install:
     - pip install -U platformio
     - platformio lib install 5495
+    - platformio lib -g install file://.
     - pip install -U cpplint
+#    - export PLATFORMIO_BUILD_FLAGS="-DTEMPLATE_PLACEHOLDER=\'~\'"
 
 script:
-    - if [[ "$CPPLINT" ]]; then cpplint --repository=. --recursive --linelength=200 --filter=-build/include  ./src; else platformio ci --lib="." ----project-conf=./platoformio.ini $PLATFORMIO_CI_EXTRA_ARGS; fi
+    - if [[ "$CPPLINT" ]]; then cpplint --repository=. --recursive --linelength=200 --filter=-build/include  ./src; else platformio ci --lib="." $PLATFORMIO_CI_EXTRA_ARGS; fi
 
 notifications:
   email:

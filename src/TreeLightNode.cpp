@@ -115,7 +115,6 @@ void TreeLightNode::sendNode(const JsonObject& nodeData, const char* value) {
     if (buffer) {
       root.printTo(reinterpret_cast<char*>(buffer->get()), len + 1);
       TreeLightClass::get()._websocket->textAll(buffer);
-
     }
   }
   char topic[63] = {"\0"};
