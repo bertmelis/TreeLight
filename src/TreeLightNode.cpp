@@ -271,3 +271,56 @@ void FloatNode::setRange(float min, float step, float max) {
   _step = step;
   _maximum = max;
 }
+
+EnumNode::EnumNode(const char* name, bool settable) :
+  TreeLightNode(name, settable),
+  _value{"\0"} {}
+
+void EnumNode::setValue(const char* value) {
+  strncpy(_value, value, sizeof(_value));
+  StaticJsonBuffer<200> jsonBuffer;
+  JsonObject& root = jsonBuffer.createObject();
+  root["name"] = _name;
+  root["value"] = _value;
+  sendNode(root, _value);
+}
+
+void EnumNode::onMessage(std::function<void(const char*)> handler) {
+  _handler = handler;
+}
+
+void EnumNode::runJson(JsonVariant payload) {
+  if (_handler) _handler(payload.as<char*>());
+}
+
+void EnumNode::runMqtt(char* payload, size_t length) {
+  // payload is not null terminated, so create a new c-string
+  char* value = new char[length + 1];
+  strncpy(value, payload, length);
+  value[length] = 0;
+  if (_handler) {
+    _handler(value);
+  }
+  // and delete the newly created c-string to avoid a memory leak
+  delete[] value;
+}
+
+void EnumNode::getNode(JsonObject* object) {
+  (*object)["name"] = _name;
+  (*object)["type"] = "ENUM";
+  (*object)["value"] = _value;
+  (*object)["settable"] = _settable;
+  if (_settable) {
+    JsonObject& set = (*object).createNestedObject("set");
+    for (uint8_t i = 0; i < _length; ++i) {
+      char index[2] = {"\0"};
+      snprintf(index, sizeof(index), "%u", i);
+      set[index] = _range[i];
+    }
+  }
+}
+
+void EnumNode::setEnum(const char** range, size_t length) {
+  _range = range;
+  _length = length;
+}
