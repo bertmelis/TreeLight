@@ -219,9 +219,10 @@ void IntNode::setRange(int32_t min, int32_t step, int32_t max) {
   _maximum = max;
 }
 
-FloatNode::FloatNode(const char* name, bool settable) :
+FloatNode::FloatNode(const char* name, bool settable, uint8_t decimals) :
   TreeLightNode(name, settable),
   _value(0),
+  _decimals(decimals),
   _minimum(0),
   _step(0),
   _maximum(0) {}
@@ -233,7 +234,7 @@ void FloatNode::setValue(float value) {
   root["name"] = _name;
   root["value"] = _value;
   char valueStr[12] = {"\0"};
-  snprintf(valueStr, sizeof(valueStr), "%f", value);
+  snprintf(valueStr, sizeof(valueStr), "%.*f", _decimals, value);
   sendNode(root, valueStr);
 }
 

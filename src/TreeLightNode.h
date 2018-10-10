@@ -96,7 +96,7 @@ class IntNode : public TreeLightNode {
 
 class FloatNode : public TreeLightNode {
  public:
-  FloatNode(const char* name, bool settable);
+  FloatNode(const char* name, bool settable, uint8_t decimals = 2);
   void setValue(float value);
   void onMessage(std::function<void(float)> handler);
   void runJson(JsonVariant payload);
@@ -108,6 +108,7 @@ class FloatNode : public TreeLightNode {
 
  protected:
   float _value;
+  const uint8_t _decimals;
   float _minimum;
   float _step;
   float _maximum;
