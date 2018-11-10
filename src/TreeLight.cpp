@@ -43,7 +43,7 @@ TreeLightClass::TreeLightClass() :
   _lastMessagesSend(0),
   _messageBuffer() {
 #if defined ARDUINO_ARCH_ESP32
-    sprintf(_hostname, "esp32-%06llx", ESP.getEfuseMac());
+    snprintf(_hostname, sizeof(_hostname), "esp32-%06llx", ESP.getEfuseMac());
 #elif defined ARDUINO_ARCH_ESP8266
     snprintf(_hostname, sizeof(_hostname), "esp8266-%06x", ESP.getChipId());
 #endif
