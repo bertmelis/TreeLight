@@ -293,7 +293,7 @@ void TreeLightClass::_updateStats(AsyncWebSocketClient* client) {
   strncat(topic, "/$status/signal", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, data["signal"]);
   // free heap
-  char freeHeap[7] = {"\0"};
+  char freeHeap[8] = {"\0"};
   snprintf(freeHeap, sizeof(freeHeap), "%uB", ESP.getFreeHeap());
   data["free heap"] = freeHeap;
   strncpy(topic, _hostname, sizeof(topic) - 1);
