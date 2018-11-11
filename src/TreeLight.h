@@ -29,6 +29,10 @@ SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #define USE_STATS 1
 #endif
 
+#ifndef BASETOPIC
+#define BASETOPIC TL
+#endif
+
 #include <queue>
 
 // Arduino framework
@@ -102,6 +106,7 @@ class TreeLightClass : public Print, public AsyncMqttClient {
   char _ssid[33];
   char _pass[65];
   char _hostname[33];
+  char _baseTopic[40];
   Ticker _timer;
   AsyncWebServer* _webserver;
   AsyncWebSocket* _websocket;

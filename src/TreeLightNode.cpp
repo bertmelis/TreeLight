@@ -118,7 +118,8 @@ void TreeLightNode::sendNode(const JsonObject& nodeData, const char* value) {
     }
   }
   char topic[63] = {"\0"};
-  strncpy(topic, TreeLightClass::get()._hostname, sizeof(topic) - 1);
+  strncpy(topic, TreeLightClass::get()._baseTopic, sizeof(topic) - 1);
+  strncat(topic, TreeLightClass::get()._hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/", sizeof(topic) - strlen(topic) - 1);
   const char* name = nodeData["name"];
   strncat(topic, name, sizeof(topic) - strlen(topic) - 1);

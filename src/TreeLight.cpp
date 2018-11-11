@@ -33,6 +33,7 @@ TreeLightClass::TreeLightClass() :
   _ssid{"\0"},
   _pass{"\0"},
   _hostname{"\0"},
+  _baseTopic{"BASETOPIC/"},
   _timer(),
   _webserver(nullptr),
   _websocket(nullptr),
@@ -145,7 +146,8 @@ void TreeLightClass::setupMqtt(const IPAddress broker, const uint16_t port) {
   AsyncMqttClient::setKeepAlive(5);
   AsyncMqttClient::setCleanSession(true);
   static char topic[63] = {"\0"};  // setWill doesn't copy so make static to keep memory available
-  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncpy(topic, _baseTopic, sizeof(topic) - 1);
+  strncat(topic, _hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::setWill(topic, 1, true, "false");
 }
@@ -227,10 +229,12 @@ void TreeLightClass::_connectToMqtt(TreeLightClass* instance) {
 void TreeLightClass::_onMqttConnected() {
   _timer.detach();  // stop connecting to Mqtt
   char topic[63] = {"\0"};
-  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncpy(topic, _baseTopic, sizeof(topic) - 1);
+  strncat(topic, _hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/$status/online", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, "true");
-  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncpy(topic, _baseTopic, sizeof(topic) - 1);
+  strncat(topic, _hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/+/set", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::subscribe(topic, 1);
 }
@@ -274,7 +278,8 @@ void TreeLightClass::_updateStats(AsyncWebSocketClient* client) {
   // uptime
   data["uptime"] = _uptime.getUptimeStr();
   char topic[63] = {"\0"};
-  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncpy(topic, _baseTopic, sizeof(topic) - 1);
+  strncat(topic, _hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/$status/uptime", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, data["uptime"]);
   // WiFi signal
@@ -289,14 +294,16 @@ void TreeLightClass::_updateStats(AsyncWebSocketClient* client) {
   }
   snprintf(signal, sizeof(signal), "%u%%", value);
   data["signal"] = signal;
-  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncpy(topic, _baseTopic, sizeof(topic) - 1);
+  strncat(topic, _hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/$status/signal", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, data["signal"]);
   // free heap
   char freeHeap[8] = {"\0"};
   snprintf(freeHeap, sizeof(freeHeap), "%uB", ESP.getFreeHeap());
   data["free heap"] = freeHeap;
-  strncpy(topic, _hostname, sizeof(topic) - 1);
+  strncpy(topic, _baseTopic, sizeof(topic) - 1);
+  strncat(topic, _hostname, sizeof(topic) - strlen(topic) - 1);
   strncat(topic, "/$status/freeheap", sizeof(topic) - strlen(topic) - 1);
   AsyncMqttClient::publish(topic, 1, true, data["free heap"]);
   size_t len = root.measureLength();
